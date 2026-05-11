@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no"/>
+  <meta name="format-detection" content="telephone=no"/>
+  <title>あなたの時間割 — グレイトヴォヤージュ</title>
+
+  <!-- Tailwind CSS（GVのビルド済みスタイル） -->
+  <link rel="stylesheet" href="https://tsio098.github.io/style/styles.css"/>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
+  <!-- LIFF SDK -->
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+      background-color: #f6faff;
+      color: #171c20;
+      min-height: 100dvh;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+
+    /* ─── ターム/曜日タブ（フォームの STEP インジケータと統一感のあるスタイル） ─── */
+    .pill-tab {
+      appearance: none;
+      border: 2px solid transparent;
+      background: #ffffff;
+      color: #43474e;
+      font-weight: 700;
+      padding: 0.625rem 1.1rem;
+      border-radius: 0.75rem;
+      white-space: nowrap;
+      transition: all .2s ease;
+      box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .pill-tab .count {
+      font-size: 0.75rem;
+      opacity: 0.7;
+      font-weight: 600;
+    }
+    .pill-tab:hover {
+      background: #f0f4fa;
+    }
+    .pill-tab.active {
+      background: linear-gradient(to bottom right, #002045, #1a365d);
+      color: #ffffff;
+      border-color: #002045;
+      box-shadow: 0 4px 6px -1px rgba(0,32,69,.15), 0 2px 4px -2px rgba(0,32,69,.1);
+    }
+    .pill-tab.active .count { opacity: 0.85; }
+    .pill-tab.empty {
+      opacity: 0.4;
+      cursor: default;
+    }
+    .pill-tab.empty:hover { background: #ffffff; }
+
+    .tab-strip {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .tab-strip::-webkit-scrollbar { display: none; }
+    .tab-strip-inner {
+      display: inline-flex;
+      gap: 0.5rem;
+      padding: 0.25rem;
+    }
+
+    /* ─── 曜日見出し（大文字＋ラベル） ─── */
+    .day-section {
+      margin-bottom: 1.75rem;
+    }
+    .day-head {
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+      margin: 0 0.25rem 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #002045;
+    }
+    .day-head .big {
+      font-family: 'Plus Jakarta Sans', 'Noto Sans JP', sans-serif;
+      font-size: 2rem;
+      font-weight: 800;
+      color: #002045;
+      line-height: 1;
+      letter-spacing: 0.04em;
+    }
+    .day-head .label {
+      font-size: 0.85rem;
+      color: #43474e;
+      font-weight: 600;
+    }
+
+    /* ─── 授業カード ─── */
+    .class-card {
+      background: #ffffff;
+      border: 2px solid transparent;
+      border-radius: 1rem;
+      padding: 1rem 1.1rem 1.1rem;
+      margin-bottom: 0.65rem;
+      box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
+      transition: all .2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .class-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; bottom: 0;
+      width: 4px;
+      background: #002045;
+      border-radius: 1rem 0 0 1rem;
+    }
+    .class-card .row1 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .class-card .time {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #002045;
+      background: #f0f4fa;
+      padding: 0.3rem 0.65rem;
+      border-radius: 999px;
+      font-variant-numeric: tabular-nums;
+    }
+    .class-card .time .material-symbols-outlined {
+      font-size: 16px;
+    }
+    .class-card .subject-icon {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #f0f4fa;
+      color: #002045;
+    }
+    .class-card .subject-icon .material-symbols-outlined { font-size: 20px; }
+    .class-card .subject {
+      font-family: 'Plus Jakarta Sans', 'Noto Sans JP', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: #171c20;
+      line-height: 1.3;
+      margin: 0 0 0.2rem;
+      word-break: break-word;
+    }
+    .class-card .course-name {
+      font-size: 0.78rem;
+      color: #43474e;
+      line-height: 1.45;
+      margin: 0 0 0.45rem;
+    }
+    .class-card .teacher {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.85rem;
+      color: #002045;
+      font-weight: 600;
+    }
+    .class-card .teacher .material-symbols-outlined {
+      font-size: 16px;
+      opacity: 0.7;
+    }
+
+    /* TBD（未定）カード */
+    .class-card.tbd {
+      background: #f0f4fa;
+      border: 2px dashed #c4c6cf;
+    }
+    .class-card.tbd::before { background: #c4c6cf; }
+    .class-card.tbd .time {
+      background: #ffffff;
+      color: #43474e;
+      border: 1px dashed #c4c6cf;
+    }
+    .class-card.tbd .subject { color: #43474e; }
+
+    /* TBDセクションの見出しは少し落ち着いた色 */
+    .tbd-section .day-head { border-bottom: 2px dashed #c4c6cf; }
+    .tbd-section .day-head .big { color: #74777f; }
+
+    /* ─── プロフィールバナー ─── */
+    .profile-banner {
+      background: linear-gradient(135deg, #002045 0%, #1a365d 100%);
+      color: #ffffff;
+      border-radius: 1rem;
+      padding: 1.25rem 1.25rem 1.1rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 4px 6px -1px rgba(0,32,69,.12), 0 2px 4px -2px rgba(0,32,69,.08);
+    }
+    .profile-banner .label-strip {
+      font-family: 'Plus Jakarta Sans', 'Noto Sans JP', sans-serif;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      font-size: 0.7rem;
+      opacity: 0.7;
+      margin-bottom: 0.4rem;
+    }
+    .profile-banner h1 {
+      font-family: 'Plus Jakarta Sans', 'Noto Sans JP', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 800;
+      line-height: 1.25;
+      margin: 0 0 0.4rem;
+    }
+    .profile-banner .meta {
+      font-size: 0.8rem;
+      opacity: 0.92;
+      line-height: 1.55;
+    }
+    .profile-banner .meta .row { display: block; }
+
+    /* ─── セクションタイトル ─── */
+    .section-title {
+      font-family: 'Plus Jakarta Sans', 'Noto Sans JP', sans-serif;
+      color: #1a365d;
+      font-weight: 800;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin: 1.25rem 0 0.6rem;
+    }
+    .section-title .material-symbols-outlined { font-size: 20px; }
+
+    /* ─── ローディング・エラー ─── */
+    .center-state {
+      text-align: center;
+      padding: 4rem 1.5rem;
+      color: #43474e;
+    }
+    .center-state .icon-circle {
+      width: 4.5rem; height: 4.5rem;
+      border-radius: 50%;
+      background: #f0f4fa;
+      color: #002045;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+    }
+    .center-state .icon-circle .material-symbols-outlined { font-size: 36px; }
+    .center-state h3 {
+      font-family: 'Plus Jakarta Sans', 'Noto Sans JP', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: #171c20;
+      margin: 0 0 0.5rem;
+    }
+    .center-state p { line-height: 1.6; font-size: 0.88rem; margin: 0; }
+    .center-state .detail {
+      font-size: 0.75rem;
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.5rem;
+      margin-top: 0.75rem;
+      word-break: break-all;
+      text-align: left;
+    }
+    .spinner-ring {
+      width: 44px; height: 44px;
+      border: 4px solid #dee3e8;
+      border-top-color: #002045;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 0 auto 0.85rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── フッター ─── */
+    .footer-note {
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid #dee3e8;
+      text-align: center;
+      font-size: 0.72rem;
+      color: #74777f;
+      line-height: 1.6;
+    }
+    .footer-note .warn {
+      margin-top: 0.5rem;
+      color: #b91c1c;
+      font-weight: 600;
+    }
+    .reload-btn {
+      margin: 1rem auto 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      appearance: none;
+      background: #ffffff;
+      color: #002045;
+      border: 1.5px solid #dee3e8;
+      padding: 0.5rem 1rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+    .reload-btn:hover { background: #f0f4fa; }
+    .reload-btn:active { transform: scale(0.95); }
+    .reload-btn .material-symbols-outlined { font-size: 16px; }
+
+    /* ─── スマホ対応 ─── */
+    body.is-mobile { font-size: 16px; }
+    body.is-mobile main { padding-left: 0.875rem !important; padding-right: 0.875rem !important; }
+    body.is-mobile .profile-banner h1 { font-size: 1.15rem; }
+    body.is-mobile .profile-banner .meta { font-size: 0.78rem; }
+    body.is-mobile .day-head .big { font-size: 1.75rem; }
+    body.is-mobile .class-card .subject { font-size: 1rem; }
+    body.is-mobile .pill-tab { padding: 0.55rem 0.9rem; font-size: 0.9rem; }
+  </style>
+
+  <script>
+    (function() {
+      function checkMobile() {
+        var w = Math.min(window.innerWidth, screen.width);
+        document.body && document.body.classList.toggle('is-mobile', w < 768);
+      }
+      if (document.body) checkMobile();
+      document.addEventListener('DOMContentLoaded', checkMobile);
+      window.addEventListener('resize', checkMobile);
+    })();
+  </script>
+</head>
+
+<body class="bg-surface text-on-surface pb-12">
+
+  <!-- ─── ヘッダー（フォームと統一） ─── -->
+  <header class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md shadow-sm flex items-center justify-between px-6 py-2">
+    <div class="flex items-center">
+      <img src="https://lh3.googleusercontent.com/d/1gsyaqDZvfGt-dRsoaCoTIUxa8GGIoEZU" alt="グレイトヴォヤージュ" class="h-12 w-auto object-contain"/>
+    </div>
+  </header>
+
+  <main class="pt-20 px-4 max-w-3xl mx-auto">
+
+    <!-- ─── ローディング ─── -->
+    <div id="loading-view" class="center-state">
+      <div class="spinner-ring"></div>
+      <p class="text-on-surface-variant font-medium">時間割を読み込んでいます…</p>
+    </div>
+
+    <!-- ─── メイン（読み込み完了後に表示） ─── -->
+    <div id="main-view" class="hidden">
+
+      <!-- プロフィールバナー -->
+      <div class="profile-banner">
+        <div class="label-strip">YOUR SCHEDULE</div>
+        <h1 id="profile-name">— さん の時間割</h1>
+        <div class="meta" id="profile-meta"></div>
+      </div>
+
+      <!-- ターム切替 -->
+      <div class="section-title">
+        <span class="material-symbols-outlined">calendar_view_month</span>
+        ターム
+      </div>
+      <div class="tab-strip"><div class="tab-strip-inner" id="term-tabs"></div></div>
+
+      <!-- 曜日タブ -->
+      <div class="section-title">
+        <span class="material-symbols-outlined">today</span>
+        曜日
+      </div>
+      <div class="tab-strip" style="position: sticky; top: 64px; z-index: 20; background: #f6faff; padding-top: 4px;">
+        <div class="tab-strip-inner" id="day-tabs"></div>
+      </div>
+
+      <!-- 時間割本文 -->
+      <div id="schedule-body" style="margin-top: 1rem;"></div>
+
+      <!-- フッター -->
+      <div class="footer-note" id="footer-note">
+        <div id="generated-at"></div>
+        <button class="reload-btn" onclick="location.reload()">
+          <span class="material-symbols-outlined">refresh</span>最新の状態に更新
+        </button>
+      </div>
+
+    </div>
+
+    <!-- ─── エラー ─── -->
+    <div id="error-view" class="hidden center-state">
+      <div class="icon-circle"><span class="material-symbols-outlined" id="error-icon">warning</span></div>
+      <h3 id="error-title">エラーが発生しました</h3>
+      <p id="error-desc">—</p>
+      <div class="detail hidden" id="error-detail"></div>
+      <button class="reload-btn" onclick="location.reload()" style="margin-top: 1.25rem;">
+        <span class="material-symbols-outlined">refresh</span>再試行
+      </button>
+    </div>
+
+  </main>
+
+  <script>
+    // ======================================================================
+    //  設定（デプロイ時に書き換える）
+    // ======================================================================
+    const CONFIG = {
+      LIFF_ID:    'PASTE_YOUR_LIFF_ID_HERE',
+      GAS_URL:    'https://script.google.com/macros/s/AKfycbwx6Jb7hJ33yyQmECVp7RdnaMhpgdiOVabO5__AKNZBTFTMsMD3RQjquSQ3iYXoV18v/exec',
+      API_SECRET: 'UCeCm8yTVjfxWfduim8PTNd8O8M3BB5lwENKVLLKuu9YYN9y',
+    };
+
+    // 科目→Material Symbols アイコン名
+    const SUBJECT_ICON = {
+      '数学': 'calculate',
+      '英語': 'language',
+      '物理': 'bolt',
+      '化学': 'science',
+      '生物': 'eco',
+      '国語': 'menu_book',
+      '地学': 'public',
+    };
+
+    const DAY_ORDER = ['月', '火', '水', '木', '金', '土', '日'];
+    const TERM_LIST = [1, 2, 3];
+
+    let CURRENT_DATA = null;
+    let CURRENT_TERM = 1;
+    let CURRENT_DAY  = null;
+
+    document.addEventListener('DOMContentLoaded', main);
+
+    async function main() {
+      try {
+        await liff.init({ liffId: CONFIG.LIFF_ID });
+        if (!liff.isLoggedIn()) {
+          liff.login({ redirectUri: window.location.href });
+          return;
+        }
+        const profile = await liff.getProfile();
+        const data = await fetchSchedule(profile.userId);
+        if (!data.ok) {
+          renderError(data);
+          return;
+        }
+        CURRENT_DATA = data;
+        renderProfile(data);
+        renderTermTabs(data);
+        const defaultTerm = pickDefaultTerm(data);
+        switchTerm(defaultTerm);
+        revealMain();
+      } catch (err) {
+        console.error(err);
+        renderError({ code: 'CLIENT_ERROR', message: String(err && err.message || err) });
+      }
+    }
+
+    async function fetchSchedule(userId) {
+      const url = CONFIG.GAS_URL
+        + '?action=getSchedule'
+        + '&userId=' + encodeURIComponent(userId)
+        + '&token='  + encodeURIComponent(CONFIG.API_SECRET)
+        + '&ua='     + encodeURIComponent(navigator.userAgent.slice(0, 100));
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }
+
+    function revealMain() {
+      document.getElementById('loading-view').classList.add('hidden');
+      document.getElementById('main-view').classList.remove('hidden');
+    }
+
+    // ─── 描画 ────────────────────────────────────────────
+
+    function renderProfile(data) {
+      document.getElementById('profile-name').textContent = data.student.name + ' さん の時間割';
+      const metaEl = document.getElementById('profile-meta');
+      metaEl.innerHTML = '';
+      if (data.student.grade) {
+        metaEl.appendChild(makeRow(data.student.grade + (data.student.school ? ' / ' + data.student.school : '')));
+      }
+      if (data.student.plan) metaEl.appendChild(makeRow(data.student.plan));
+    }
+
+    function renderTermTabs(data) {
+      const wrap = document.getElementById('term-tabs');
+      wrap.innerHTML = '';
+      TERM_LIST.forEach(t => {
+        const count = (data.schedule || []).filter(c => c.term === t).length;
+        const btn = document.createElement('button');
+        btn.className = 'pill-tab';
+        btn.dataset.term = t;
+        btn.innerHTML = 'ターム' + t + '<span class="count">' + (count > 0 ? count + 'コマ' : '0') + '</span>';
+        if (count === 0) btn.classList.add('empty');
+        btn.addEventListener('click', () => switchTerm(t));
+        wrap.appendChild(btn);
+      });
+    }
+
+    function pickDefaultTerm(data) {
+      for (const t of TERM_LIST) {
+        if ((data.schedule || []).some(c => c.term === t)) return t;
+      }
+      return 1;
+    }
+
+    function switchTerm(term) {
+      CURRENT_TERM = term;
+      document.querySelectorAll('#term-tabs .pill-tab').forEach(b => {
+        b.classList.toggle('active', Number(b.dataset.term) === term);
+      });
+      renderTermContent(term);
+    }
+
+    function renderTermContent(term) {
+      const data = CURRENT_DATA;
+      const body    = document.getElementById('schedule-body');
+      const dayTabs = document.getElementById('day-tabs');
+      body.innerHTML = '';
+      dayTabs.innerHTML = '';
+
+      const classesInTerm = (data.schedule || []).filter(c => c.term === term);
+
+      if (classesInTerm.length === 0) {
+        body.innerHTML =
+          '<div class="center-state">' +
+            '<div class="icon-circle"><span class="material-symbols-outlined">inventory_2</span></div>' +
+            '<h3>ターム' + term + 'には登録された講座がありません</h3>' +
+            '<p>他のタームを選んでください。</p>' +
+          '</div>';
+        renderFooter(data);
+        return;
+      }
+
+      const confirmed = classesInTerm.filter(c => !c.tbd);
+      const tbd       = classesInTerm.filter(c =>  c.tbd);
+
+      // 曜日グループ化（確定分）
+      const byDay = {};
+      DAY_ORDER.forEach(d => byDay[d] = []);
+      confirmed.forEach(c => { if (byDay[c.day]) byDay[c.day].push(c); });
+
+      // 曜日タブ
+      DAY_ORDER.forEach(day => {
+        const count = byDay[day].length;
+        const btn = document.createElement('button');
+        btn.className = 'pill-tab' + (count === 0 ? ' empty' : '');
+        btn.dataset.day = day;
+        btn.innerHTML = day + (count > 0 ? '<span class="count">' + count + '</span>' : '');
+        btn.addEventListener('click', () => scrollToDay(day));
+        dayTabs.appendChild(btn);
+      });
+      if (tbd.length > 0) {
+        const btn = document.createElement('button');
+        btn.className = 'pill-tab';
+        btn.dataset.day = '未定';
+        btn.innerHTML = '未定<span class="count">' + tbd.length + '</span>';
+        btn.addEventListener('click', () => scrollToDay('未定'));
+        dayTabs.appendChild(btn);
+      }
+
+      // 本文（確定分）
+      DAY_ORDER.forEach(day => {
+        const classes = byDay[day];
+        if (classes.length === 0) return;
+
+        const sec = document.createElement('section');
+        sec.className = 'day-section';
+        sec.id = 'day-' + day;
+
+        const head = document.createElement('div');
+        head.className = 'day-head';
+        head.innerHTML =
+          '<span class="big">' + day + '</span>' +
+          '<span class="label">' + day + '曜日 ・ ' + classes.length + 'コマ</span>';
+        sec.appendChild(head);
+
+        classes.forEach(c => sec.appendChild(makeClassCard(c)));
+        body.appendChild(sec);
+      });
+
+      // 本文（未定分）
+      if (tbd.length > 0) {
+        const sec = document.createElement('section');
+        sec.className = 'day-section tbd-section';
+        sec.id = 'day-未定';
+
+        const head = document.createElement('div');
+        head.className = 'day-head';
+        head.innerHTML =
+          '<span class="big"><span class="material-symbols-outlined" style="font-size:32px;">schedule</span></span>' +
+          '<span class="label">時間未定の講座 ・ ' + tbd.length + 'コマ</span>';
+        sec.appendChild(head);
+
+        tbd.forEach(c => sec.appendChild(makeClassCard(c)));
+        body.appendChild(sec);
+      }
+
+      const firstDay = DAY_ORDER.find(d => byDay[d].length > 0) || (tbd.length > 0 ? '未定' : null);
+      if (firstDay) highlightDayTab(firstDay);
+
+      setupScrollSpy(DAY_ORDER.concat(['未定']));
+      renderFooter(data);
+    }
+
+    function makeClassCard(c) {
+      const card = document.createElement('article');
+      card.className = 'class-card' + (c.tbd ? ' tbd' : '');
+
+      const row1 = document.createElement('div');
+      row1.className = 'row1';
+
+      // 時刻
+      const time = document.createElement('span');
+      time.className = 'time';
+      if (c.tbd) {
+        time.innerHTML = '<span class="material-symbols-outlined">schedule</span>時間未定';
+      } else {
+        time.innerHTML = '<span class="material-symbols-outlined">schedule</span>' +
+          (c.startTime || '') + '–' + (c.endTime || '');
+      }
+      row1.appendChild(time);
+
+      // 科目アイコン
+      const iconWrap = document.createElement('span');
+      iconWrap.className = 'subject-icon';
+      const iconName = SUBJECT_ICON[c.subject] || 'menu_book';
+      iconWrap.innerHTML = '<span class="material-symbols-outlined">' + iconName + '</span>';
+      row1.appendChild(iconWrap);
+
+      card.appendChild(row1);
+
+      // 科目+レベル
+      const subj = document.createElement('h3');
+      subj.className = 'subject';
+      subj.textContent = (c.subject || '') + (c.level ? ' ' + c.level : '');
+      card.appendChild(subj);
+
+      // 講座名（科目+レベルと違う場合のみ）
+      if (c.courseName && c.courseName !== subj.textContent) {
+        const cn = document.createElement('p');
+        cn.className = 'course-name';
+        cn.textContent = c.courseName;
+        card.appendChild(cn);
+      }
+
+      // 担当
+      if (c.teacher) {
+        const t = document.createElement('div');
+        t.className = 'teacher';
+        t.innerHTML = '<span class="material-symbols-outlined">person</span>担当 ' + escapeHtml(c.teacher);
+        card.appendChild(t);
+      }
+
+      return card;
+    }
+
+    function renderFooter(data) {
+      let warn = '';
+      if (data.notFoundCourses && data.notFoundCourses.length > 0) {
+        warn = '※ 一部の講座（' + data.notFoundCourses.length + '件）が時間割マスターに未登録です。担当者にご連絡ください。';
+      }
+      document.getElementById('generated-at').innerHTML =
+        formatGeneratedAt(data.generatedAt) +
+        (warn ? '<div class="warn">' + escapeHtml(warn) + '</div>' : '');
+    }
+
+    // ─── 補助 ────────────────────────────────────────────
+
+    function makeRow(text) {
+      const r = document.createElement('span');
+      r.className = 'row';
+      r.textContent = text;
+      return r;
+    }
+
+    function scrollToDay(day) {
+      const el = document.getElementById('day-' + day);
+      if (!el) return;
+      const offset = 130; // ヘッダー + sticky 曜日タブ
+      const y = el.getBoundingClientRect().top + window.pageYOffset - offset;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+      highlightDayTab(day);
+    }
+
+    function highlightDayTab(day) {
+      CURRENT_DAY = day;
+      const tabs = document.querySelectorAll('#day-tabs .pill-tab');
+      tabs.forEach(b => b.classList.toggle('active', b.dataset.day === day));
+      const active = Array.from(tabs).find(b => b.dataset.day === day);
+      if (active) active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+
+    function setupScrollSpy(days) {
+      let ticking = false;
+      window.addEventListener('scroll', () => {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(() => {
+          const top = window.scrollY + 150;
+          let current = null;
+          for (const d of days) {
+            const sec = document.getElementById('day-' + d);
+            if (sec && sec.offsetTop <= top) current = d;
+          }
+          if (current && current !== CURRENT_DAY) highlightDayTab(current);
+          ticking = false;
+        });
+      });
+    }
+
+    function formatGeneratedAt(iso) {
+      if (!iso) return '';
+      try {
+        const d = new Date(iso);
+        const pad = n => String(n).padStart(2, '0');
+        return '最終更新: ' + d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate())
+             + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function renderError(data) {
+      document.getElementById('loading-view').classList.add('hidden');
+      document.getElementById('main-view').classList.add('hidden');
+      document.getElementById('error-view').classList.remove('hidden');
+
+      const messages = {
+        NOT_REGISTERED: ['登録が見つかりません', 'この LINE アカウントは未登録です。事務局にご連絡ください。', 'badge'],
+        INVALID_TOKEN:  ['認証エラー', 'アプリの設定に問題があります。担当者にご連絡ください。', 'lock'],
+        INVALID_PARAM:  ['パラメータエラー', '画面をリロードしてもう一度お試しください。', 'error'],
+        INTERNAL_ERROR: ['サーバーエラー', 'しばらく時間をおいて再度お試しください。', 'cloud_off'],
+        CLIENT_ERROR:   ['ネットワークエラー', '通信状態をご確認のうえ再度お試しください。', 'wifi_off'],
+      };
+      const [title, desc, icon] = messages[data.code] || ['エラーが発生しました', String(data.message || ''), 'warning'];
+
+      document.getElementById('error-icon').textContent = icon;
+      document.getElementById('error-title').textContent = title;
+      document.getElementById('error-desc').textContent = desc;
+      const detailEl = document.getElementById('error-detail');
+      if (data.message && data.code !== 'NOT_REGISTERED') {
+        detailEl.classList.remove('hidden');
+        detailEl.textContent = data.message;
+      } else {
+        detailEl.classList.add('hidden');
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
+    }
+  </script>
+
+</body>
+</html>
