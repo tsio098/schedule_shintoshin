@@ -349,14 +349,14 @@
 
 <body class="bg-surface text-on-surface pb-12">
 
-  <!-- ─── ヘッダー（フォームと統一） ─── -->
-  <header class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md shadow-sm flex items-center justify-between px-6 py-2">
+  <!-- ─── ヘッダー（sticky配置: 常時上部に貼りつきつつ通常フロー内のため重なりなし） ─── -->
+  <header id="page-header" class="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-md shadow-sm flex items-center justify-between px-6 py-2">
     <div class="flex items-center">
-      <img src="https://lh3.googleusercontent.com/d/1gsyaqDZvfGt-dRsoaCoTIUxa8GGIoEZU" alt="グレイトヴォヤージュ" class="h-12 w-auto object-contain"/>
+      <img src="https://lh3.googleusercontent.com/d/1gsyaqDZvfGt-dRsoaCoTIUxa8GGIoEZU" alt="グレイトヴォヤージュ" class="h-10 w-auto object-contain"/>
     </div>
   </header>
 
-  <main class="pt-20 px-4 max-w-3xl mx-auto">
+  <main class="pt-3 px-4 max-w-3xl mx-auto">
 
     <!-- ─── ローディング ─── -->
     <div id="loading-view" class="center-state">
@@ -386,7 +386,8 @@
         <span class="material-symbols-outlined">today</span>
         曜日
       </div>
-      <div class="tab-strip" style="position: sticky; top: 64px; z-index: 20; background: #f6faff; padding-top: 4px;">
+      <!-- ヘッダー(sticky top:0, 高さ約56px) の直下に貼り付ける -->
+      <div class="tab-strip" style="position: sticky; top: 56px; z-index: 20; background: #f6faff; padding-top: 4px; padding-bottom: 4px;">
         <div class="tab-strip-inner" id="day-tabs"></div>
       </div>
 
@@ -421,9 +422,9 @@
     //  設定（デプロイ時に書き換える）
     // ======================================================================
     const CONFIG = {
-      LIFF_ID:    '2009771008-YhYfKbFK',
-      GAS_URL:    'https://script.google.com/macros/s/AKfycbwx6Jb7hJ33yyQmECVp7RdnaMhpgdiOVabO5__AKNZBTFTMsMD3RQjquSQ3iYXoV18v/exec',
-      API_SECRET: 'UCeCm8yTVjfxWfduim8PTNd8O8M3BB5lwENKVLLKuu9YYN9y',
+      LIFF_ID:    'PASTE_YOUR_LIFF_ID_HERE',
+      GAS_URL:    'https://script.google.com/macros/s/PASTE_YOUR_DEPLOY_ID/exec',
+      API_SECRET: 'PASTE_API_SECRET_HERE',
     };
 
     // 科目→Material Symbols アイコン名
@@ -694,7 +695,8 @@
     function scrollToDay(day) {
       const el = document.getElementById('day-' + day);
       if (!el) return;
-      const offset = 130; // ヘッダー + sticky 曜日タブ
+      // sticky ヘッダー(56px) + sticky 曜日タブ(~50px) のぶん上にずらす
+      const offset = 120;
       const y = el.getBoundingClientRect().top + window.pageYOffset - offset;
       window.scrollTo({ top: y, behavior: 'smooth' });
       highlightDayTab(day);
@@ -714,7 +716,8 @@
         if (ticking) return;
         ticking = true;
         requestAnimationFrame(() => {
-          const top = window.scrollY + 150;
+          // sticky ヘッダー + 曜日タブの高さぶんを「すでに見えている境界」として加算
+          const top = window.scrollY + 140;
           let current = null;
           for (const d of days) {
             const sec = document.getElementById('day-' + d);
