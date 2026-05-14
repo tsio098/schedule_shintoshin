@@ -447,8 +447,35 @@
 
     document.addEventListener('DOMContentLoaded', main);
 
+    /**
+     * CONFIG の値がプレースホルダのままになっていないかチェック
+     */
+    function validateConfig_() {
+      const issues = [];
+      if (!CONFIG.LIFF_ID || CONFIG.LIFF_ID === 'PASTE_YOUR_LIFF_ID_HERE') {
+        issues.push('LIFF_ID');
+      }
+      if (!CONFIG.GAS_URL || CONFIG.GAS_URL.indexOf('PASTE_YOUR_DEPLOY_ID') >= 0 || CONFIG.GAS_URL === '') {
+        issues.push('GAS_URL');
+      }
+      if (!CONFIG.API_SECRET || CONFIG.API_SECRET === 'PASTE_API_SECRET_HERE') {
+        issues.push('API_SECRET');
+      }
+      return issues;
+    }
+
     async function main() {
       try {
+        // 起動前のセルフチェック: プレースホルダのままの値を検出
+        const missing = validateConfig_();
+        if (missing.length > 0) {
+          renderError({
+            code: 'CONFIG_ERROR',
+            message: 'index.html の CONFIG セクションを実値に置き換えてください: ' + missing.join(', '),
+          });
+          return;
+        }
+
         await liff.init({ liffId: CONFIG.LIFF_ID });
         if (!liff.isLoggedIn()) {
           liff.login({ redirectUri: window.location.href });
@@ -468,7 +495,16 @@
         revealMain();
       } catch (err) {
         console.error(err);
-        renderError({ code: 'CLIENT_ERROR', message: String(err && err.message || err) });
+        // LIFF SDK のメッセージで設定エラーを判別
+        const msg = String(err && err.message || err);
+        if (/invalid liff id/i.test(msg) || /liff id/i.test(msg)) {
+          renderError({
+            code: 'CONFIG_ERROR',
+            message: 'LIFF_ID が無効です。LINE Developers で発行された ID を index.html の CONFIG.LIFF_ID に正しく貼り付けてください。元エラー: ' + msg,
+          });
+          return;
+        }
+        renderError({ code: 'CLIENT_ERROR', message: msg });
       }
     }
 
@@ -752,6 +788,7 @@
         INVALID_PARAM:  ['パラメータエラー', '画面をリロードしてもう一度お試しください。', 'error'],
         INTERNAL_ERROR: ['サーバーエラー', 'しばらく時間をおいて再度お試しください。', 'cloud_off'],
         CLIENT_ERROR:   ['ネットワークエラー', '通信状態をご確認のうえ再度お試しください。', 'wifi_off'],
+        CONFIG_ERROR:   ['設定エラー（管理者向け）', 'index.html の CONFIG セクションが未設定のまま公開されています。管理者にご連絡ください。', 'settings'],
       };
       const [title, desc, icon] = messages[data.code] || ['エラーが発生しました', String(data.message || ''), 'warning'];
 
